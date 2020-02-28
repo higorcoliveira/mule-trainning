@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="55788ce4-a12a-443d-9c1a-1648a84f00c1" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="c6fea80e-939e-4691-8cd0-b34cada177c9" >
+		<db:my-sql-connection host="mudb.learn.mulesoft.com" port="3306" user="mule" password="mule" database="training"/>
+	</db:config>
+	<flow name="getFlights" doc:id="6a88abb9-4d77-4c5d-8ebc-14a5233b93be" >
+		<http:listener doc:name="Listener" doc:id="4a577924-b9b8-4b89-9e81-59450e2a376f" config-ref="HTTP_Listener_config" path="/flights" allowedMethods="GET">
+			<ee:repeatable-file-store-stream inMemorySize="1024" />
+		</http:listener>
+		<db:select doc:name="Select" doc:id="1cf8ba69-a2a3-4033-bf22-f9cc934e2f3a" config-ref="Database_Config">
+			<db:sql >SELECT *
+
+FROM american</db:sql>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="ef8f4d3b-d7ed-4c5d-bbe6-d87fdf4340f2" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload map ( payload01 , indexOfPayload01 ) -> {
+	ID: payload01.ID,
+	code: (payload01.code1 default "") ++ (payload01.code2 default ""),
+	price: payload01.price default 0,
+	origin: payload01.fromAirport default "",
+	destination: payload01.toAirport default "",
+	emptySeats: payload01.seatsAvailable default 0,
+	plane: {
+		"type": payload01.planeType default "",
+		totalSeats: payload01.totalSeats default 0
+	}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="getFlightsById" doc:id="ada7af63-43d0-453c-9f76-53835545ab59" >
+		<http:listener doc:name="Listener" doc:id="6bb54a30-a932-4714-848e-c70e07510cd3" config-ref="HTTP_Listener_config" path="/flights/{ID}" allowedMethods="GET" >
+			<ee:repeatable-file-store-stream inMemorySize="1024" />
+		</http:listener>
+		<db:select doc:name="Select By Id" doc:id="f8a5b1ae-6aa7-4741-8864-2dd00eb96053" config-ref="Database_Config" transactionalAction="NOT_SUPPORTED" queryTimeoutUnit="DAYS">
+			<db:sql >SELECT *
+
+FROM american
+
+WHERE ID = :ID</db:sql>
+			<db:input-parameters ><![CDATA[#[{'ID' : attributes.uriParams.ID}]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="Copy_of_Transform Message" doc:id="b83c7a00-44db-45c6-a2b2-b33e81d2b99f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload map ( payload01 , indexOfPayload01 ) -> {
+	ID: payload01.ID,
+	code: (payload01.code1 default "") ++ (payload01.code2 default ""),
+	price: payload01.price default 0,
+	origin: payload01.fromAirport default "",
+	destination: payload01.toAirport default "",
+	emptySeats: payload01.seatsAvailable default 0,
+	plane: {
+		"type": payload01.planeType default "",
+		totalSeats: payload01.totalSeats default 0
+	}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="postFlight" doc:id="45df740c-c938-470b-bb62-6a18457e3225" >
+		<http:listener doc:name="Listener" doc:id="3ba7a0c4-f273-49d8-96a7-1f4ab8b66f32" config-ref="HTTP_Listener_config" path="/flights" allowedMethods="POST">
+			<ee:repeatable-file-store-stream inMemorySize="1024" />
+		</http:listener>
+		<set-payload value='{"message": "Flight added (but not really)"}' doc:name="Set Payload" doc:id="1c574ea6-b966-4fd8-9b49-521b7f3c070e" />
+	</flow>
+</mule>
