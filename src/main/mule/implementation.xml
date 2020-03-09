@@ -13,9 +13,6 @@ http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/
 		<db:my-sql-connection host="mudb.learn.mulesoft.com" port="3306" user="mule" password="mule" database="training"/>
 	</db:config>
 	<flow name="getFlights" doc:id="6a88abb9-4d77-4c5d-8ebc-14a5233b93be" >
-		<http:listener doc:name="Listener" doc:id="4a577924-b9b8-4b89-9e81-59450e2a376f" config-ref="HTTP_Listener_config" path="/flights" allowedMethods="GET">
-			<ee:repeatable-file-store-stream inMemorySize="1024" />
-		</http:listener>
 		<db:select doc:name="Select" doc:id="1cf8ba69-a2a3-4033-bf22-f9cc934e2f3a" config-ref="Database_Config">
 			<db:sql >SELECT *
 
@@ -42,9 +39,6 @@ payload map ( payload01 , indexOfPayload01 ) -> {
 		</ee:transform>
 	</flow>
 	<flow name="getFlightsById" doc:id="ada7af63-43d0-453c-9f76-53835545ab59" >
-		<http:listener doc:name="Listener" doc:id="6bb54a30-a932-4714-848e-c70e07510cd3" config-ref="HTTP_Listener_config" path="/flights/{ID}" allowedMethods="GET" >
-			<ee:repeatable-file-store-stream inMemorySize="1024" />
-		</http:listener>
 		<db:select doc:name="Select By Id" doc:id="f8a5b1ae-6aa7-4741-8864-2dd00eb96053" config-ref="Database_Config" transactionalAction="NOT_SUPPORTED" queryTimeoutUnit="DAYS">
 			<db:sql >SELECT *
 
@@ -74,9 +68,6 @@ payload map ( payload01 , indexOfPayload01 ) -> {
 		</ee:transform>
 	</flow>
 	<flow name="postFlight" doc:id="45df740c-c938-470b-bb62-6a18457e3225" >
-		<http:listener doc:name="Listener" doc:id="3ba7a0c4-f273-49d8-96a7-1f4ab8b66f32" config-ref="HTTP_Listener_config" path="/flights" allowedMethods="POST">
-			<ee:repeatable-file-store-stream inMemorySize="1024" />
-		</http:listener>
 		<set-payload value='{"message": "Flight added (but not really)"}' doc:name="Set Payload" doc:id="1c574ea6-b966-4fd8-9b49-521b7f3c070e" />
 	</flow>
 </mule>
