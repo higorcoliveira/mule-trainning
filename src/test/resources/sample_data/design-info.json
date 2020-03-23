@@ -1,7 +1,10 @@
 {
   "sampleData": {
-    "ef8f4d3b-d7ed-4c5d-bbe6-d87fdf4340f2": {
-      "payload": "sample_data/list_object.dwl"
+    "794dcc57-8f22-4cdd-a100-f0e1ad3aa385": {
+      "payload": "sample_data/listallflightsresponse.xml"
+    },
+    "3d8e2cad-accd-40bd-9cca-bff8785a9688": {
+      "payload": "sample_data/json_1.json"
     }
   }
 }

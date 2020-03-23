@@ -1,73 +1,285 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:db="http://www.mulesoft.org/schema/mule/db"
-	xmlns:http="http://www.mulesoft.org/schema/mule/http"
-	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:wsc="http://www.mulesoft.org/schema/mule/wsc"
+	xmlns:american-flights-api="http://www.mulesoft.org/schema/mule/american-flights-api" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
-http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
-http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
-	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="55788ce4-a12a-443d-9c1a-1648a84f00c1" >
-		<http:listener-connection host="0.0.0.0" port="8081" />
-	</http:listener-config>
-	<db:config name="Database_Config" doc:name="Database Config" doc:id="c6fea80e-939e-4691-8cd0-b34cada177c9" >
-		<db:my-sql-connection host="mudb.learn.mulesoft.com" port="3306" user="mule" password="mule" database="training"/>
-	</db:config>
-	<flow name="getFlights" doc:id="6a88abb9-4d77-4c5d-8ebc-14a5233b93be" >
-		<db:select doc:name="Select" doc:id="1cf8ba69-a2a3-4033-bf22-f9cc934e2f3a" config-ref="Database_Config">
-			<db:sql >SELECT *
-
-FROM american</db:sql>
-		</db:select>
-		<ee:transform doc:name="Transform Message" doc:id="ef8f4d3b-d7ed-4c5d-bbe6-d87fdf4340f2" >
-			<ee:message >
-				<ee:set-payload ><![CDATA[%dw 2.0
+http://www.mulesoft.org/schema/mule/american-flights-api http://www.mulesoft.org/schema/mule/american-flights-api/current/mule-american-flights-api.xsd
+http://www.mulesoft.org/schema/mule/wsc http://www.mulesoft.org/schema/mule/wsc/current/mule-wsc.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
+	<flow name="getFlights" doc:id="89dd52d6-a3b3-450e-9ef1-f5862f56737e" >
+		<set-variable value="#[message.attributes.queryParams.airline]" doc:name="airline" doc:id="11a7689c-da2c-45c3-b431-424b0f67cc89" variableName="airline"/>
+		<flow-ref doc:name="setCode" doc:id="eff041ae-4195-4e75-aa54-ae25118988b3" name="code"/>
+		<validation:is-true doc:name="is valid destination" doc:id="09bd8dd8-63f9-46fd-924c-b457a8efbb48" expression="#[['SFO','LAX','CLE','PDX','PDF'] contains vars.code]" message="#['Invalid destination' ++ ' ' ++ (vars.code default '')]">
+			<error-mapping sourceType="VALIDATION:INVALID_BOOLEAN" targetType="APP:INVALID_DESTINATION" />
+		</validation:is-true>
+		<choice doc:name="Choice" doc:id="a7c465c7-9e1c-4b41-ad21-592cfdb45b83" >
+			<when expression='#[vars.airline == "american"]'>
+				<flow-ref doc:name="getAmericanFlights" doc:id="420ac1f7-e1e7-49a4-8984-2c556ca6490a" name="getAmericanFlights"/>
+			</when>
+			<when expression='#[vars.airline == "united"]'>
+				<flow-ref doc:name="getUnitedFlights" doc:id="3b211bd5-3fcb-4e4e-8811-2da0c1915ef9" name="getUnitedFlights"/>
+			</when>
+			<when expression='#[vars.airline == "delta"]'>
+				<flow-ref doc:name="getDeltaFlights" doc:id="8d763ffc-4416-4ac1-b1e5-05fc0ef7b12d" name="getDeltaFlights"/>
+			</when>
+			<otherwise >
+				<flow-ref doc:name="getAllAirlineFlights" doc:id="27653f71-8968-43e3-86d7-2684ccbb7b83" name="getAllAirlineFlights"/>
+			</otherwise>
+		</choice>
+		<ee:transform doc:name="Flights to JSON" doc:id="0695ff14-ec89-4307-b2bc-c16005c3120d">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
 output application/json
 ---
-payload map ( payload01 , indexOfPayload01 ) -> {
-	ID: payload01.ID,
-	code: (payload01.code1 default "") ++ (payload01.code2 default ""),
-	price: payload01.price default 0,
-	origin: payload01.fromAirport default "",
-	destination: payload01.toAirport default "",
-	emptySeats: payload01.seatsAvailable default 0,
-	plane: {
-		"type": payload01.planeType default "",
-		totalSeats: payload01.totalSeats default 0
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="c2e5499a-60a3-4d4a-93a5-acf4e9aae653" />
+	</flow>
+	<sub-flow name="code" doc:id="5017562e-57df-4257-9386-5e0fb77a80cb" >
+		<set-variable value="#[message.attributes.queryParams.code]" doc:name="Set Code" doc:id="8ad1dd3a-086b-46bf-90b6-bba6f4a052ce" variableName="code"/>
+	</sub-flow>
+	<flow name="getAllAirlineFlights" doc:id="40d51910-4285-4409-bfa2-8df776ad40b2" >
+		<scatter-gather doc:name="Scatter-Gather" doc:id="22f69868-5527-4e2d-b05b-7d941fd1e6b0" >
+			<route >
+				<try doc:name="Try" doc:id="174f9c95-ab2a-40df-a44f-ed43ced622a3" >
+					<flow-ref doc:name="getAmericanFlights" doc:id="ac4ab9db-684a-4abc-9ded-d6134ac3448f" name="getAmericanFlights" />
+					<error-handler >
+						<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="a01852f5-b57e-45c7-b211-43859bd3c1f6" type="ANY">
+							<ee:transform doc:name="[]" doc:id="87416c38-67d8-4425-b833-8693346fa2c7" >
+								<ee:message >
+									<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-payload>
+								</ee:message>
+							</ee:transform>
+						</on-error-continue>
+					</error-handler>
+				</try>
+			</route>
+			<route >
+				<try doc:name="Try" doc:id="f015ec3b-59fd-4d2b-b5d7-2620a02d31f0" >
+					<flow-ref doc:name="getUnitedFlights" doc:id="7a212eff-1019-4f9a-95bb-6b2f9cac860c" name="getUnitedFlights" />
+					<error-handler >
+						<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="3f540d85-c098-421d-8746-55ab093b0076" type="ANY">
+							<ee:transform doc:name="[]" doc:id="d3c2e43d-8bfc-4749-83a4-b9e523bb42f7" >
+								<ee:message >
+									<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-payload>
+								</ee:message>
+							</ee:transform>
+						</on-error-continue>
+					</error-handler>
+				</try>
+			</route>
+			<route >
+				<try doc:name="Try" doc:id="bcda2d4d-df0d-48b7-90ac-be6d22402868" >
+					<flow-ref doc:name="getDeltaFlights" doc:id="b807d06a-2a90-4890-8fb7-0e5fd596f83f" name="getDeltaFlights" />
+					<error-handler >
+						<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="9c52a6dd-b303-42e9-b977-9fbb82fb2e4e" type="ANY">
+							<ee:transform doc:name="[]" doc:id="63fb3489-7d69-4ed5-995f-312d9768153e" >
+								<ee:message >
+									<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[]]]></ee:set-payload>
+								</ee:message>
+							</ee:transform>
+						</on-error-continue>
+					</error-handler>
+				</try>
+			</route>
+		</scatter-gather>
+		<ee:transform doc:name="flatten to Flight" doc:id="5e33ae6c-7c39-43fb-99c5-82c4fb2c3496" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+flatten(payload..payload)]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="2df20338-b7e1-49fe-a417-f98f94a7f477" />
+	</flow>
+	<flow name="getDeltaFlights" doc:id="24673257-3ff6-4bcf-ad1e-bfed70f60f76" >
+		<ee:transform doc:name="Pass Code" doc:id="42bc87e2-de29-4519-9798-4595bacc23cd" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/xml
+ns ns0 http://soap.training.mulesoft.com/
+---
+{
+	ns0#findFlight: {
+		destination: vars.code
 	}
 }]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
-	</flow>
-	<flow name="getFlightsById" doc:id="ada7af63-43d0-453c-9f76-53835545ab59" >
-		<db:select doc:name="Select By Id" doc:id="f8a5b1ae-6aa7-4741-8864-2dd00eb96053" config-ref="Database_Config" transactionalAction="NOT_SUPPORTED" queryTimeoutUnit="DAYS">
-			<db:sql >SELECT *
-
-FROM american
-
-WHERE ID = :ID</db:sql>
-			<db:input-parameters ><![CDATA[#[{'ID' : attributes.uriParams.ID}]]]></db:input-parameters>
-		</db:select>
-		<ee:transform doc:name="Copy_of_Transform Message" doc:id="b83c7a00-44db-45c6-a2b2-b33e81d2b99f" >
+		<wsc:consume doc:name="Get Flights" doc:id="194685ac-bffd-4490-a5d0-a727ca7eedb3" config-ref="Web_Service_Consumer_Config" operation="findFlight"/>
+		<ee:transform doc:name="SOAP TO Flight" doc:id="fd767421-3dac-4e5f-86a1-b45411649441" >
 			<ee:message >
 				<ee:set-payload ><![CDATA[%dw 2.0
-output application/json
+output application/java
+ns ns0 http://soap.training.mulesoft.com/
 ---
-payload map ( payload01 , indexOfPayload01 ) -> {
-	ID: payload01.ID,
-	code: (payload01.code1 default "") ++ (payload01.code2 default ""),
-	price: payload01.price default 0,
-	origin: payload01.fromAirport default "",
-	destination: payload01.toAirport default "",
-	emptySeats: payload01.seatsAvailable default 0,
-	plane: {
-		"type": payload01.planeType default "",
-		totalSeats: payload01.totalSeats default 0
-	}
+payload.body.ns0#findFlightResponse.*return map ( return , indexOfReturn ) -> {
+	airlineName: return.airlineName,
+	availableSeats: return.emptySeats,
+	departureDate: return.departureDate,
+	destination: return.destination,
+	flightCode: return.code,
+	origination: return.origin,
+	planeType: return.planeType,
+	price: return.price
+} as Object {
+	class : "com.mulesoft.training.Flight"
 }]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="c34835bf-c059-43e8-98f2-6519f3c6cf54" />
 	</flow>
-	<flow name="postFlight" doc:id="45df740c-c938-470b-bb62-6a18457e3225" >
-		<set-payload value='{"message": "Flight added (but not really)"}' doc:name="Set Payload" doc:id="1c574ea6-b966-4fd8-9b49-521b7f3c070e" />
+	<flow name="getUnitedFlights" doc:id="5c87b6e9-bc67-4d21-a884-8935df8dd722" >
+		<http:request method="GET" doc:name="Get flights" doc:id="09b78f9d-3a4e-4914-90b4-b36655493835" config-ref="HTTP_Request_configuration" path="/united/flights/{dest}">
+			<http:uri-params ><![CDATA[#[output application/java
+---
+{
+	"dest" : vars.code
+}]]]></http:uri-params>
+		</http:request>
+		<ee:transform doc:name="JSON to Flight" doc:id="101c9d02-5bba-4e03-a2f1-19b5e632dd2d" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload.flights map ( flight , indexOfFlight ) -> {
+	airlineName: flight.airlineName,
+	availableSeats: flight.emptySeats,
+	departureDate: flight.departureDate,
+	destination: flight.destination,
+	flightCode: flight.code,
+	origination: flight.origin,
+	planeType: flight.planeType,
+	price: flight.price
+} as Object {
+	class : "com.mulesoft.training.Flight"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="ada85c03-7bc6-4eae-a2a5-049e37afd9b6" />
+	</flow>
+	<flow name="getAmericanFlights" doc:id="03e7c7a4-e0c0-49b4-93b1-9e4af41371ec" >
+		<american-flights-api:get-flights doc:name="Get flights" doc:id="466bc282-7cff-439a-9004-f74897022d9d" config-ref="American_Flights_API_Config" client-id="${american.client_id}" client-secret="${american.client_secret}" destination="#[vars.code]"/>
+		<ee:transform doc:name="JSON to Flight" doc:id="f9616027-6adc-473d-84a8-62cbb65165c6" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload map (payload01, index01) -> {
+	airlineName: "American",
+	availableSeats: payload01.emptySeats,
+	departureDate: payload01.departureDate,
+	destination: payload01.destination,
+	flightCode: payload01.code,
+	origination: payload01.origin,
+	planeType: payload01.plane."type",
+	price: payload01.price
+} as Object {
+	class : "com.mulesoft.training.Flight"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="09067a0a-6e87-44a2-a90d-c79f9f250e64" />
+		<error-handler >
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="f92f3965-5e36-42a1-b205-76ebf37b6c9f" type="AMERICAN-FLIGHTS-API:BAD_REQUEST">
+				<ee:transform doc:name="No flights" doc:id="11d24575-3fe4-4d21-b202-b33c26f223b1" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "No flights to" ++ vars.code as String
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<set-variable value="200" doc:name="httpStatus" doc:id="0494313e-dbac-42d8-a8a6-b1fd65f7efd4" variableName="httpStatus"/>
+			</on-error-continue>
+		</error-handler>
+	</flow>
+	<flow name="postMultipleFlights" doc:id="578205d1-b24a-4d98-b449-d97cf959f2e6" >
+		<http:listener doc:name="POST /multipleflights" doc:id="9c85a3ae-fc10-4b0f-9735-0e8051fec8de" config-ref="HTTP_Listener_config" path="/multipleflights"/>
+		<ee:transform doc:name="Transform Message" doc:id="794dcc57-8f22-4cdd-a100-f0e1ad3aa385" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[import dasherize from dw::core::Strings
+%dw 2.0
+output application/dw
+type Currency = String {format: "###.00"}
+type Flight = Object {class: "com.mulesoft.training.Flight"}
+
+//var numSeats = (x=400) -> x
+//var numSeats = (planeType: String) ->
+//	if(planeType contains('737'))
+//		150
+//	else
+//		300
+
+fun getNumSeats(planeType: String) =
+	if(planeType contains('737'))
+		150
+	else
+		300
+		
+
+---
+using (flights = payload..*return map (object,index) -> {
+        destination: object.destination,
+    	price: object.price as Number,
+//    	totalSeats: getNumSeats(object.planeType as String),
+		totalSeats: lookup("getTotalSeats", {planeType: object.planeType}),
+    	planeType: dasherize(replace(object.planeType,/(Boing)/) with "Boeing"),
+    	departureDate: object.departureDate as Date {format: "yyyy/MM/dd"} as String {format: "MMM dd, yyyy"},
+    	availableSeats: object.emptySeats as Number
+   } as Object
+)
+flights distinctBy $
+		filter ($.availableSeats !=0)
+		orderBy $.departureDate
+		orderBy $.price]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="f899729a-0331-497a-ad83-2c12a46608f3" />
+	</flow>
+	<flow name="postFlight" doc:id="230cb3d0-84f6-4de4-96f9-d3bee78b89ba" >
+		<ee:transform doc:name="Transform Message" doc:id="3d8e2cad-accd-40bd-9cca-bff8785a9688" >
+			<ee:message >
+				<ee:set-payload resource="json_flight_playground.dwl" />
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="DWoutput" ><![CDATA[%dw 2.0
+output application/xml
+---
+data: payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="a4b4b0bf-dbc6-4982-9230-75ecde6e6c98" message="#[vars.DWoutput]"/>
+	</flow>
+	<flow name="getTotalSeats" doc:id="f52b2c7d-538c-484f-beec-a12e736ba1c1" >
+		<ee:transform doc:name="Transform Message" doc:id="77eee3bc-a1ed-4192-bdb4-676007ec226d" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+
+fun getNumSeats(planetType: String) =
+	if(planetType contains('737'))
+		150
+	else
+		300
+---
+getNumSeats(payload.planetType)]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
 	</flow>
 </mule>
